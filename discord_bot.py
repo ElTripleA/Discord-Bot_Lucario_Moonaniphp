@@ -164,7 +164,7 @@ def _build_detail_embed(
 
     embed = discord.Embed(
         title=f"{spawn.name} (#{spawn.number})",
-        description=f"Coords: `{spawn.coords}`",
+        description=f"{spawn.coords}",
         color=color,
     )
     embed.add_field(name="Mapa", value=f"[Abrir en Google Maps]({spawn.maps_url})", inline=False)

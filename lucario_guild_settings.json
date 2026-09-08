@@ -1,0 +1,20 @@
+{
+  "guilds": {
+    "1546637349260238972": {
+      "watches": [
+        {
+          "pokemon": "Lucario",
+          "channel_id": 1546703614695841842
+        },
+        {
+          "pokemon": "flamigo",
+          "channel_id": 1546703614695841842
+        }
+      ],
+      "iv100_channels": [],
+      "iv0_channels": [],
+      "pvp_gl1_channels": [],
+      "pvp_ul1_channels": []
+    }
+  }
+}
