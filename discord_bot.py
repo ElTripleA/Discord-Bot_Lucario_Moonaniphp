@@ -543,10 +543,18 @@ class LucarioDiscordBot(commands.Bot):
             if isinstance(raw_watches, list):
                 for watch in raw_watches:
                     if isinstance(watch, dict) and watch.get("pokemon") and watch.get("channel_id"):
+                        level = watch.get("nivel")
+                        try:
+                            parsed_level = int(level) if level is not None else None
+                        except (TypeError, ValueError):
+                            parsed_level = None
+                        if parsed_level is not None and not 1 <= parsed_level <= 50:
+                            parsed_level = None
                         watches.append(
                             {
                                 "pokemon": str(watch["pokemon"]),
                                 "channel_id": int(watch["channel_id"]),
+                                "nivel": parsed_level,
                             }
                         )
 
@@ -625,14 +633,16 @@ class LucarioDiscordBot(commands.Bot):
         self._save_settings()
         return True
 
-    def add_watch(self, guild_id: int, pokemon: str, channel_id: int) -> None:
+    def add_watch(self, guild_id: int, pokemon: str, channel_id: int, nivel: Optional[int] = None) -> None:
         settings = self._ensure_guild_settings(guild_id)
         pokemon_key = _normalize_watch_name(pokemon)
         settings["watches"] = [
             w for w in settings.get("watches", [])
             if _normalize_watch_name(str(w.get("pokemon", ""))) != pokemon_key
         ]
-        settings["watches"].append({"pokemon": pokemon.strip(), "channel_id": channel_id})
+        settings["watches"].append(
+            {"pokemon": pokemon.strip(), "channel_id": channel_id, "nivel": nivel}
+        )
         self.watch_seen_cache.pop((guild_id, f"{WATCH_KIND_PREFIX}:{pokemon_key}"), None)
         self._save_settings()
 
@@ -963,7 +973,12 @@ class LucarioDiscordBot(commands.Bot):
                     pokemon_key = _normalize_watch_name(pokemon_name)
                     seen_key = (guild_id, f"{WATCH_KIND_PREFIX}:{pokemon_key}")
                     seen = self.watch_seen_cache.setdefault(seen_key, set())
-                    watch_spawns = normalized_matches.get(pokemon_key, [])
+                    watch_level = watch.get("nivel")
+                    watch_spawns = [
+                        spawn
+                        for spawn in normalized_matches.get(pokemon_key, [])
+                        if watch_level is None or spawn.level == watch_level
+                    ]
 
                     for spawn in watch_spawns:
                         if spawn.unique_key in seen:
@@ -1166,13 +1181,18 @@ def register_commands(bot: LucarioDiscordBot) -> None:
             await interaction.followup.send(f"{header}{chunk}")
 
     @bot.tree.command(name="agregar_seguimiento", description="Guarda un seguimiento de Pokemon especifico en un canal.")
-    @app_commands.describe(pokemon="Nombre del Pokemon a seguir", canal="Canal asociado al seguimiento")
+    @app_commands.describe(
+        pokemon="Nombre del Pokemon a seguir",
+        canal="Canal asociado al seguimiento",
+        nivel="Nivel exacto a seguir (opcional, entre 1 y 50)",
+    )
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.guild_only()
     async def agregar_seguimiento(
         interaction: discord.Interaction,
         pokemon: str,
         canal: discord.TextChannel,
+        nivel: Optional[app_commands.Range[int, 1, 50]] = None,
     ) -> None:
         if interaction.guild_id is None:
             await interaction.response.send_message("Este comando solo se puede usar dentro de un servidor.", ephemeral=True)
@@ -1184,11 +1204,12 @@ def register_commands(bot: LucarioDiscordBot) -> None:
             return
 
         await interaction.response.defer(ephemeral=True, thinking=True)
-        bot.add_watch(interaction.guild_id, pokemon, canal.id)
+        bot.add_watch(interaction.guild_id, pokemon, canal.id, nivel)
         channel_notice_sent = False
         try:
+            level_notice = f" de nivel **{nivel}**" if nivel is not None else " de cualquier nivel"
             await canal.send(
-                f"Lucario activo el seguimiento de **{pokemon}** en este canal.\n"
+                f"Lucario activo el seguimiento de **{pokemon}**{level_notice} en este canal.\n"
                 "Revisare Moonani periodicamente y avisare aqui cuando encuentre 100 IV que coincidan."
             )
             channel_notice_sent = True
@@ -1196,12 +1217,12 @@ def register_commands(bot: LucarioDiscordBot) -> None:
             print(f"No pude publicar la activacion del seguimiento '{pokemon}' en el canal {canal.id}: {exc}")
         await interaction.followup.send(
             (
-                f"Seguimiento guardado para **{pokemon}** en {canal.mention}.\n"
+                f"Seguimiento guardado para **{pokemon}**{level_notice} en {canal.mention}.\n"
                 "El monitoreo 100 IV quedo activo con una consulta compartida y periodica."
             )
             if channel_notice_sent
             else (
-                f"Seguimiento guardado para **{pokemon}** en {canal.mention}, "
+                f"Seguimiento guardado para **{pokemon}**{level_notice} en {canal.mention}, "
                 "pero no pude publicar el aviso inicial en ese canal. Revisa permisos de envio."
             ),
             ephemeral=True,
@@ -1238,7 +1259,9 @@ def register_commands(bot: LucarioDiscordBot) -> None:
         else:
             lines = []
             for watch in watches:
-                lines.append(f"• **{watch['pokemon']}** -> <#{watch['channel_id']}>")
+                level = watch.get("nivel")
+                level_label = f" | Nivel {level}" if level is not None else " | Cualquier nivel"
+                lines.append(f"• **{watch['pokemon']}**{level_label} -> <#{watch['channel_id']}>")
             embed.description = "\n".join(lines)
 
         embed.set_footer(text="Seguimientos 100 IV activos en Lucario")

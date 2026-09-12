@@ -65,7 +65,7 @@ Si tu idioma nativo es el español, puedes revisar el `Spanish.md` en ese idioma
 - `/ver_canales_pvp`: shows the saved global pvp GL1 and UL1 channels
 - `/quitar_canal_pvp_gl1`: disables pvp GL1 alerts on the configured channel
 - `/quitar_canal_pvp_ul1`: disables pvp UL1 alerts on the configured channel
-- `/agregar_seguimiento`: adds alerts for a specific iv100 Pokemon in a channel
+- `/agregar_seguimiento`: adds alerts for a specific iv100 Pokemon in a channel; the optional `nivel` argument filters an exact level from 1 to 50
 - `/ver_seguimientos`: view all configured iv100 Pokemon watches
 - `/quitar_seguimiento`: removes alerts for a specific iv100 Pokemon from the channel
 
